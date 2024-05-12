@@ -10,8 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-
       - name: Install GitHub CLI
         run: |
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
@@ -20,18 +18,23 @@ jobs:
           sudo apt install gh
 
       - name: Sync Forks
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           # 登录到 GitHub CLI
-          echo "${{ secrets.GH_TOKEN }}" | gh auth login --with-token
+          echo "$GH_TOKEN" | gh auth login --with-token
 
           # 获取所有已经 fork 的仓库
           repos=$(gh repo list --limit 1000 --json nameWithOwner --jq '.[].nameWithOwner | select(contains("'${{ github.repository_owner }}'"))' | grep -v "${{ github.repository }}")
 
           # 遍历每个已经 fork 的仓库并执行同步
           for repo in $repos; do
+            # 克隆 fork 的仓库
+            gh repo clone "$repo"
+            cd "$(basename "$repo")"
+
             # 将原仓库添加为远程仓库
-            gh repo set-default "$repo"
-            git remote add upstream "https://github.com/$(echo "$repo" | cut -d'/' -f1-2).git"
+            gh repo fork --remote=true
 
             # 获取原仓库的更新并合并
             git fetch upstream
@@ -39,6 +42,8 @@ jobs:
 
             # 将更新推送到 GitHub
             git push
+
+            cd ..
 
             echo "Synced $repo"
           done
