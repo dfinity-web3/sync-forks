@@ -1,0 +1,35 @@
+name: Sync Forks
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # 每天午夜运行
+  workflow_dispatch: # 允许手动触发工作流
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Sync Forks
+        run: |
+          # 安装 GitHub CLI
+          brew install gh
+
+          # 登录到 GitHub CLI
+          echo "${{ secrets.GH_TOKEN }}" | gh auth login --with-token
+
+          # 获取所有 fork 的仓库
+          repos=$(gh repo list --limit 1000 --json nameWithOwner --jq '.[].nameWithOwner | select(contains("'${{ github.repository_owner }}'"))' | grep -v "${{ github.repository }}")
+
+          # 遍历每个 fork 的仓库并执行同步
+          for repo in $repos; do
+            # 将原仓库添加为远程仓库
+            gh repo fork "$repo" -- remote add upstream "https://github.com/$(echo "$repo" | cut -d'/' -f1-2).git"
+
+            # 获取原仓库的更新
+            gh repo sync "$repo" -- -b master
+
+            echo "Synced $repo"
+          done
