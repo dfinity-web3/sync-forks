@@ -3,7 +3,7 @@ name: Sync Forks
 on:
   schedule:
     - cron: '0 0 * * *'  # 每天凌晨执行
-  workflow_dispatch:  # 添加手动触发器
+  workflow_dispatch:
 
 jobs:
   sync:
@@ -20,20 +20,22 @@ jobs:
       run: |
         echo "GH_TOKEN=${{ secrets.GH_TOKEN }}" >> $GITHUB_ENV
 
-    - name: Sync fork 1
+    - name: Get list of forked repositories
       run: |
-        rm -rf repo1
-        gh repo clone your-username/repo1 repo1
-        cd repo1
-        git remote add upstream https://github.com/original-owner/repo1.git
-        git pull upstream main
-        git push origin main
+        gh repo list --limit 1000 --json nameWithOwner --jq '.[].nameWithOwner' > repos.txt
 
-    - name: Sync fork 2
+    - name: Sync forked repositories
       run: |
-        rm -rf repo2
-        gh repo clone your-username/repo2 repo2
-        cd repo2
-        git remote add upstream https://github.com/original-owner/repo2.git
-        git pull upstream develop
-        git push origin develop
+        while read repo; do
+          echo "Syncing $repo"
+          rm -rf "$repo"
+          gh repo clone "$repo"
+          cd "$(basename "$repo")"
+          upstream_repo="$(echo "$repo" | sed "s/^${{ github.repository_owner }}\//${ORIGINAL_OWNER}\//")
+          git remote add upstream "https://github.com/$upstream_repo.git"
+          git pull upstream HEAD
+          git push origin HEAD
+          cd ..
+        done < repos.txt
+      env:
+        ORIGINAL_OWNER: original-owner  # 替换为上游仓库的所有者
