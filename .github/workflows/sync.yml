@@ -24,16 +24,21 @@ jobs:
           # 登录到 GitHub CLI
           echo "${{ secrets.GH_TOKEN }}" | gh auth login --with-token
 
-          # 获取所有 fork 的仓库
+          # 获取所有已经 fork 的仓库
           repos=$(gh repo list --limit 1000 --json nameWithOwner --jq '.[].nameWithOwner | select(contains("'${{ github.repository_owner }}'"))' | grep -v "${{ github.repository }}")
 
-          # 遍历每个 fork 的仓库并执行同步
+          # 遍历每个已经 fork 的仓库并执行同步
           for repo in $repos; do
             # 将原仓库添加为远程仓库
-            gh repo fork "$repo" -- remote add upstream "https://github.com/$(echo "$repo" | cut -d'/' -f1-2).git"
+            gh repo set-default "$repo"
+            git remote add upstream "https://github.com/$(echo "$repo" | cut -d'/' -f1-2).git"
 
-            # 获取原仓库的更新
-            gh repo sync "$repo" -- -b master
+            # 获取原仓库的更新并合并
+            git fetch upstream
+            git merge upstream/master
+
+            # 将更新推送到 GitHub
+            git push
 
             echo "Synced $repo"
           done
