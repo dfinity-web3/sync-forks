@@ -31,11 +31,9 @@ jobs:
           rm -rf "$repo"
           gh repo clone "$repo"
           cd "$(basename "$repo")"
-          upstream_repo="$(echo "$repo" | sed "s/^${{ github.repository_owner }}\//${ORIGINAL_OWNER}\//")
+          upstream_repo="$(echo "$repo" | sed "s/^${{ github.repository_owner }}\///")"
           git remote add upstream "https://github.com/$upstream_repo.git"
           git pull upstream HEAD
           git push origin HEAD
           cd ..
         done < repos.txt
-      env:
-        ORIGINAL_OWNER: original-owner  # 替换为上游仓库的所有者
