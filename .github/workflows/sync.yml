@@ -22,7 +22,7 @@ jobs:
 
     - name: Get list of forked repositories
       run: |
-        gh repo list --limit 1000 --json nameWithOwner --jq '.[].nameWithOwner' > repos.txt
+        gh repo list --limit 1000 --json nameWithOwner,isFork --jq '.[] | select(.isFork == true) | .nameWithOwner' > repos.txt
 
     - name: Sync forked repositories
       run: |
@@ -31,7 +31,7 @@ jobs:
           rm -rf "$repo"
           gh repo clone "$repo"
           cd "$(basename "$repo")"
-          upstream_repo="$(echo "$repo" | sed "s/^${{ github.repository_owner }}\///")"
+          upstream_repo="$(gh repo view --json parent --jq '.parent.nameWithOwner')"
           git remote add upstream "https://github.com/$upstream_repo.git"
           git pull upstream HEAD
           git push origin HEAD
