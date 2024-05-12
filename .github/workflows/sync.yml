@@ -2,51 +2,38 @@ name: Sync Forks
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 每天午夜运行
-  workflow_dispatch: # 允许手动触发工作流
+    - cron: '0 0 * * *'  # 每天凌晨执行
+  workflow_dispatch:  # 添加手动触发器
 
 jobs:
   sync:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install GitHub CLI
-        run: |
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt update
-          sudo apt install gh
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GH_TOKEN }}
 
-      - name: Sync Forks
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          # 清除 GH_TOKEN 环境变量
-          unset GH_TOKEN
+    - name: Set up GitHub CLI
+      run: |
+        echo "GH_TOKEN=${{ secrets.GH_TOKEN }}" >> $GITHUB_ENV
 
-          # 登录到 GitHub CLI
-          echo "${{ secrets.GH_TOKEN }}" | gh auth login --with-token
+    - name: Sync fork 1
+      run: |
+        rm -rf repo1
+        gh repo clone your-username/repo1 repo1
+        cd repo1
+        git remote add upstream https://github.com/original-owner/repo1.git
+        git pull upstream main
+        git push origin main
 
-          # 获取所有已经 fork 的仓库
-          repos=$(gh repo list --limit 1000 --json nameWithOwner --jq '.[].nameWithOwner | select(contains("'${{ github.repository_owner }}'"))' | grep -v "${{ github.repository }}")
-
-          # 遍历每个已经 fork 的仓库并执行同步
-          for repo in $repos; do
-            # 克隆 fork 的仓库
-            gh repo clone "$repo"
-            cd "$(basename "$repo")"
-
-            # 将原仓库添加为远程仓库
-            gh repo fork --remote=true
-
-            # 获取原仓库的更新并合并
-            git fetch upstream
-            git merge upstream/master
-
-            # 将更新推送到 GitHub
-            git push
-
-            cd ..
-
-            echo "Synced $repo"
-          done
+    - name: Sync fork 2
+      run: |
+        rm -rf repo2
+        gh repo clone your-username/repo2 repo2
+        cd repo2
+        git remote add upstream https://github.com/original-owner/repo2.git
+        git pull upstream develop
+        git push origin develop
